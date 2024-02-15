@@ -42,6 +42,21 @@ Scalar BLUE = Scalar(255, 178, 50);
 Scalar YELLOW = Scalar(0, 255, 255);
 Scalar RED = Scalar(0, 0, 255);
 
+static bool loadCameraParams(const string& filename, Size& imageSize, Size& boardSize, Mat& cameraMatrix, Mat& distCoeffs, float& squareSize, double& totalAvgErr) {
+    FileStorage fs(filename, FileStorage::READ);
+
+    imageSize.width = fs["image_width"];
+    imageSize.height = fs["image_height"];
+    boardSize.width = fs["board_width"];
+    boardSize.height = fs["board_height"];
+    fs["square_size"] >> squareSize;
+    fs["camera_matrix"] >> cameraMatrix;
+    fs["distortion_coefficients"] >> distCoeffs;
+
+    totalAvgErr = fs["avg_reprojection_error"];
+    return (fs.isOpened());
+}
+
 
 // Draw the predicted bounding box.
 void draw_label(Mat& input_image, string label, int left, int top)
@@ -169,27 +184,61 @@ Mat post_process(Mat& input_image, vector<Mat>& outputs, const vector<string>& c
 }
 
 
-int main()
+int main(int argc, char** argv)
 {
+    Size boardSize, imageSize;
+    Mat cameraMatrix, distCoeffs;
+    float squareSize;
+    double totalAvgErr = 0;
+
+    string model_name_file;
+    string classes_name_file;
+
     // Load class list.
     vector<string> class_list;
-    ifstream ifs("../weapon_classes.names");
-    //ifstream ifs("coco.names");
     string line;
 
     VideoCapture cam;
 
+    cv::CommandLineParser parser(argc, argv,
+        "{c|../out_camera_data.yml|}"
+        "{m|../models/net.onnx|}"
+        "{n|../weapon_classes.names|}"); // to load the configuration file
+
+    if (parser.has("m")) {
+        model_name_file=parser.get<string>("m");
+    }
+
+    if (parser.has("n")) {
+        classes_name_file = parser.get<string>("n");
+    }
+
+    if (parser.has("c")) {
+        std::string loadFilename = parser.get<string>("c");
+        struct stat buffer;
+        if (!(stat(loadFilename.c_str(), &buffer) == 0 && loadCameraParams(loadFilename, imageSize, boardSize, cameraMatrix, distCoeffs, squareSize, totalAvgErr))) {
+            return fprintf(stderr, "Failed to open camera parameters files\n"), -1;
+        }
+    }
+
     const char* winName = "Image View";
     namedWindow(winName, 1);
+
+    //ifstream ifs("coco.names");
+    ifstream ifs(classes_name_file);
 
     while (getline(ifs, line))
     {
         class_list.push_back(line);
     }
 
+    if (class_list.size() == 0) {
+        return fprintf(stderr, "Failed to load camera names\n"), -1;
+    }
+
     // Load model.
     Net net;
-    net = readNet("../models/2024-02-13_v5s.onnx");
+    net = readNet(model_name_file);
     //net = readNet("models/yolov5s.onnx");
 
     cam.open(0);
