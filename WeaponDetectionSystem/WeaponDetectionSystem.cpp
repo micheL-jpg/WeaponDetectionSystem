@@ -38,6 +38,7 @@ const int THICKNESS = 1;
 
 // Colors.
 Scalar BLACK = Scalar(0, 0, 0);
+Scalar GREEN = Scalar(0, 255, 0);
 Scalar BLUE = Scalar(255, 178, 50);
 Scalar YELLOW = Scalar(0, 255, 255);
 Scalar RED = Scalar(0, 0, 255);
@@ -175,7 +176,6 @@ Mat draw_boxes(Mat& input_image, const vector<string>& class_name, double focal,
         cout << "class_wisth: " << classes_width[class_ids[idx]] << endl;
         cout << "focal: " << focal << endl;
 
-
         // Draw bounding box.
         rectangle(input_image, Point(left, top), Point(left + width, top + height), BLUE, 3 * THICKNESS);
 
@@ -291,7 +291,6 @@ int main(int argc, char** argv)
     string classes_name_file;
     string width_name_file;
 
-    // Load class list.
     vector<string> class_list;
     vector<double> width_list;
     string line;
@@ -302,7 +301,6 @@ int main(int argc, char** argv)
     vector<float> confidences;
     vector<Rect> boxes;
 
-    vector<float> classes_width(80, 20);
     double focal;
 
     cv::CommandLineParser parser(argc, argv,
@@ -331,12 +329,7 @@ int main(int argc, char** argv)
         }
     }
 
-    /*cout << "Mat pos (0,0): " << cameraMatrix << endl;
-    cout << "Mat pos (0,0): " << cameraMatrix.at<float>(1, 1) << endl;*/
-
     focal = cameraMatrix.at<double>(0, 0);
-
-    cout << "Focal: " << cameraMatrix << endl;
 
     const char* winName = "Image View";
     namedWindow(winName, 1);
@@ -369,12 +362,9 @@ int main(int argc, char** argv)
         return fprintf(stderr, "Names of classes and default width of the objects are not the same\n"), -1;
     }
 
-    cout << width_list.size() << endl;
-
     // Load model.
     Net net;
     net = readNet(model_name_file);
-    //net = readNet("models/yolov5s.onnx");
 
     cam.open(0);
 
@@ -387,6 +377,8 @@ int main(int argc, char** argv)
 
     for (int i = 0;; i++)
     {
+        int64 start = cv::getTickCount();
+
         // Load image.
         Mat frame0;
         Mat frame;
@@ -396,14 +388,24 @@ int main(int argc, char** argv)
             frame0.copyTo(frame);
         }
 
+        int64 start_pre = cv::getTickCount();
+
         vector<Mat> detections;
         detections = pre_process(frame, net);
+
+        double end_pre = (cv::getTickCount() - start_pre)/getTickFrequency();
+
+        std::cout << "Preprocess count : " << end_pre << std::endl;
+
+        int64 start_post = cv::getTickCount();
 
         Mat temp = frame.clone();
         post_process(temp, detections, class_list.size(), class_ids, confidences, boxes);
         Mat img = draw_boxes(temp, class_list, focal, width_list, class_ids, confidences, boxes);
 
-        //Mat img = post_process(temp, detections, class_list);
+        double end_post = (cv::getTickCount() - start_post) / getTickFrequency();
+
+        std::cout << "Postprocess count : " << end_post << std::endl;
 
         // Put efficiency information.
         // The function getPerfProfile returns the overall time for inference(t) and the timings for each of the layers(in layersTimes)
@@ -413,15 +415,27 @@ int main(int argc, char** argv)
         double t = net.getPerfProfile(layersTimes) / freq;
         string label = format("Inference time : %.2f ms", t);
         putText(img, label, Point(20, 40), FONT_FACE, FONT_SCALE, RED);
-
-        imshow(winName, img);
         //waitKey(0);
 
         class_ids.clear();
         confidences.clear();
         boxes.clear();
 
-        char c = (char)waitKey(cam.isOpened() ? 50 : 500);
+        double fps = cv::getTickFrequency() / (cv::getTickCount() - start);
+
+        string label_fps = "fps: " + to_string(fps);
+
+        int baseline = 0;
+
+        Size textSize = getTextSize(label_fps, FONT_FACE, FONT_SCALE, THICKNESS, &baseline);
+
+        Point textOrg(0,textSize.height);
+
+        putText(img, label_fps, textOrg, FONT_FACE, FONT_SCALE, GREEN);
+
+        imshow(winName, img);
+
+        char c = (char)waitKey(1);
         if (c == 27 || c == 'q' || c == 'Q')
             break;
     }
