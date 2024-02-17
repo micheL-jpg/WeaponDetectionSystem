@@ -157,7 +157,7 @@ float compute_distance(float focalLenght, float knownWidth, float perWidth) {
     return (knownWidth * focalLenght) / perWidth;
 }
 
-Mat draw_boxes(Mat& input_image, const vector<string>& class_name, double focal, vector<float> classes_width ,vector<int>& class_ids, vector<float>& confidences, vector<Rect>& boxes) {
+Mat draw_boxes(Mat& input_image, const vector<string>& class_name, double focal, vector<double> classes_width ,vector<int>& class_ids, vector<float>& confidences, vector<Rect>& boxes) {
     // Perform Non Maximum Suppression and draw predictions.
     vector<int> indices;
     NMSBoxes(boxes, confidences, SCORE_THRESHOLD, NMS_THRESHOLD, indices);
@@ -289,9 +289,11 @@ int main(int argc, char** argv)
 
     string model_name_file;
     string classes_name_file;
+    string width_name_file;
 
     // Load class list.
     vector<string> class_list;
+    vector<double> width_list;
     string line;
 
     VideoCapture cam;
@@ -305,8 +307,9 @@ int main(int argc, char** argv)
 
     cv::CommandLineParser parser(argc, argv,
         "{c|../out_camera_data.yml|}"
-        "{m|../models/yolov5s.onnx|}"
-        "{n|../coco.names|}"); // to load the configuration file
+        "{m|../models/net.onnx|}"
+        "{n|../weapon_classes.names|}"
+        "{w|../width.names|}"); // to load the configuration file
 
     if (parser.has("m")) {
         model_name_file=parser.get<string>("m");
@@ -314,6 +317,10 @@ int main(int argc, char** argv)
 
     if (parser.has("n")) {
         classes_name_file = parser.get<string>("n");
+    }
+
+    if (parser.has("w")) {
+        width_name_file = parser.get<string>("w");
     }
 
     if (parser.has("c")) {
@@ -324,8 +331,8 @@ int main(int argc, char** argv)
         }
     }
 
-    cout << "Mat pos (0,0): " << cameraMatrix << endl;
-    cout << "Mat pos (0,0): " << cameraMatrix.at<float>(1, 1) << endl;
+    /*cout << "Mat pos (0,0): " << cameraMatrix << endl;
+    cout << "Mat pos (0,0): " << cameraMatrix.at<float>(1, 1) << endl;*/
 
     focal = cameraMatrix.at<double>(0, 0);
 
@@ -335,9 +342,9 @@ int main(int argc, char** argv)
     namedWindow(winName, 1);
 
     //ifstream ifs("coco.names");
-    ifstream ifs(classes_name_file);
+    ifstream ifsn(classes_name_file);
 
-    while (getline(ifs, line))
+    while (getline(ifsn, line))
     {
         class_list.push_back(line);
     }
@@ -345,6 +352,24 @@ int main(int argc, char** argv)
     if (class_list.size() == 0) {
         return fprintf(stderr, "Failed to load camera names\n"), -1;
     }
+
+    ifstream ifsw(width_name_file);
+
+    while (getline(ifsw, line))
+    {
+        cout << line << endl;
+        width_list.push_back(stod(line));
+    }
+
+    if (width_list.size() == 0) {
+        return fprintf(stderr, "Failed to load default widths\n"), -1;
+    }
+
+    if (width_list.size() != class_list.size()) {
+        return fprintf(stderr, "Names of classes and default width of the objects are not the same\n"), -1;
+    }
+
+    cout << width_list.size() << endl;
 
     // Load model.
     Net net;
@@ -376,7 +401,9 @@ int main(int argc, char** argv)
 
         Mat temp = frame.clone();
         post_process(temp, detections, class_list.size(), class_ids, confidences, boxes);
-        Mat img = draw_boxes(temp, class_list, focal, classes_width ,class_ids, confidences, boxes);
+        Mat img = draw_boxes(temp, class_list, focal, width_list, class_ids, confidences, boxes);
+
+        //Mat img = post_process(temp, detections, class_list);
 
         // Put efficiency information.
         // The function getPerfProfile returns the overall time for inference(t) and the timings for each of the layers(in layersTimes)
@@ -389,6 +416,10 @@ int main(int argc, char** argv)
 
         imshow(winName, img);
         //waitKey(0);
+
+        class_ids.clear();
+        confidences.clear();
+        boxes.clear();
 
         char c = (char)waitKey(cam.isOpened() ? 50 : 500);
         if (c == 27 || c == 'q' || c == 'Q')
