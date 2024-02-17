@@ -94,6 +94,101 @@ vector<Mat> pre_process(Mat& input_image, Net& net)
     return outputs;
 }
 
+void post_process(Mat& input_image, vector<Mat>& outputs, int classes_number, vector<int>& class_ids, vector<float>& confidences, vector<Rect>& boxes)
+{
+    float x_factor = input_image.cols / INPUT_WIDTH;
+    float y_factor = input_image.rows / INPUT_HEIGHT;
+
+    float* data = (float*)outputs[0].data;
+
+    auto dimensions = outputs[0].size[2];
+    auto rows = outputs[0].size[1];
+
+    /*cout << "Dimesnions = " << endl << " " << dimensions << endl << endl;
+    cout << "Rows = " << endl << " " << rows << endl << endl;*/
+
+    // Iterate through 25200 detections.
+    for (int i = 0; i < rows; ++i)
+    {
+        float confidence = data[4];
+        // Discard bad detections and continue.
+        if (confidence >= CONFIDENCE_THRESHOLD)
+        {
+            float* classes_scores = data + 5;
+            // Create a 1x85 Mat and store class scores of 80 classes.
+            Mat scores(1, classes_number, CV_32FC1, classes_scores);
+
+            //cout << "M = " << endl << " " << scores << endl << endl;
+
+            // Perform minMaxLoc and acquire index of best class score.
+            Point class_id;
+            double max_class_score;
+            minMaxLoc(scores, 0, &max_class_score, 0, &class_id);
+            // Continue if the class score is above the threshold.
+            if (max_class_score > SCORE_THRESHOLD)
+            {
+                // Store class ID and confidence in the pre-defined respective vectors.
+
+                confidences.push_back(confidence);
+                class_ids.push_back(class_id.x);
+
+                // Center.
+                float cx = data[0];
+                float cy = data[1];
+                // Box dimension.
+                float w = data[2];
+                float h = data[3];
+                // Bounding box coordinates.
+                int left = int((cx - 0.5 * w) * x_factor);
+                int top = int((cy - 0.5 * h) * y_factor);
+                int width = int(w * x_factor);
+                int height = int(h * y_factor);
+                // Store good detections in the boxes vector.
+                boxes.push_back(Rect(left, top, width, height));
+            }
+
+        }
+        // Jump to the next column.
+        data += dimensions;
+    }
+}
+
+float compute_distance(float focalLenght, float knownWidth, float perWidth) {
+    return (knownWidth * focalLenght) / perWidth;
+}
+
+Mat draw_boxes(Mat& input_image, const vector<string>& class_name, double focal, vector<float> classes_width ,vector<int>& class_ids, vector<float>& confidences, vector<Rect>& boxes) {
+    // Perform Non Maximum Suppression and draw predictions.
+    vector<int> indices;
+    NMSBoxes(boxes, confidences, SCORE_THRESHOLD, NMS_THRESHOLD, indices);
+    for (int i = 0; i < indices.size(); i++)
+    {
+        int idx = indices[i];
+        Rect box = boxes[idx];
+
+        int left = box.x;
+        int top = box.y;
+        int width = box.width;
+        int height = box.height;
+
+        cout << "width: " << to_string(width) << endl;
+        cout << "class_wisth: " << classes_width[class_ids[idx]] << endl;
+        cout << "focal: " << focal << endl;
+
+
+        // Draw bounding box.
+        rectangle(input_image, Point(left, top), Point(left + width, top + height), BLUE, 3 * THICKNESS);
+
+        float distance = compute_distance(focal, classes_width[class_ids[idx]], width);
+
+        // Get the label for the class name and its confidence.
+        string label = format("%.2f", confidences[idx]);
+        label = class_name[class_ids[idx]] + ":" + label + " - d: " + to_string(distance);
+        // Draw class labels.
+        draw_label(input_image, label, left, top);
+    }
+    return input_image;
+}
 
 Mat post_process(Mat& input_image, vector<Mat>& outputs, const vector<string>& class_name)
 {
@@ -171,6 +266,7 @@ Mat post_process(Mat& input_image, vector<Mat>& outputs, const vector<string>& c
         int top = box.y;
         int width = box.width;
         int height = box.height;
+
         // Draw bounding box.
         rectangle(input_image, Point(left, top), Point(left + width, top + height), BLUE, 3 * THICKNESS);
 
@@ -200,10 +296,17 @@ int main(int argc, char** argv)
 
     VideoCapture cam;
 
+    vector<int> class_ids;
+    vector<float> confidences;
+    vector<Rect> boxes;
+
+    vector<float> classes_width(80, 20);
+    double focal;
+
     cv::CommandLineParser parser(argc, argv,
         "{c|../out_camera_data.yml|}"
-        "{m|../models/net.onnx|}"
-        "{n|../weapon_classes.names|}"); // to load the configuration file
+        "{m|../models/yolov5s.onnx|}"
+        "{n|../coco.names|}"); // to load the configuration file
 
     if (parser.has("m")) {
         model_name_file=parser.get<string>("m");
@@ -220,6 +323,13 @@ int main(int argc, char** argv)
             return fprintf(stderr, "Failed to open camera parameters files\n"), -1;
         }
     }
+
+    cout << "Mat pos (0,0): " << cameraMatrix << endl;
+    cout << "Mat pos (0,0): " << cameraMatrix.at<float>(1, 1) << endl;
+
+    focal = cameraMatrix.at<double>(0, 0);
+
+    cout << "Focal: " << cameraMatrix << endl;
 
     const char* winName = "Image View";
     namedWindow(winName, 1);
@@ -265,7 +375,8 @@ int main(int argc, char** argv)
         detections = pre_process(frame, net);
 
         Mat temp = frame.clone();
-        Mat img = post_process(temp, detections, class_list);
+        post_process(temp, detections, class_list.size(), class_ids, confidences, boxes);
+        Mat img = draw_boxes(temp, class_list, focal, classes_width ,class_ids, confidences, boxes);
 
         // Put efficiency information.
         // The function getPerfProfile returns the overall time for inference(t) and the timings for each of the layers(in layersTimes)
