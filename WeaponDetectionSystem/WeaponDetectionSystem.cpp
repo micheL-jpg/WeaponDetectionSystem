@@ -175,7 +175,7 @@ Mat draw_boxes(Mat& input_image, const vector<string>& class_name, double focal,
         // Draw bounding box.
         rectangle(input_image, Point(left, top), Point(left + width, top + height), BLUE, 3 * THICKNESS);
 
-        float distance = compute_distance(focal, classes_width[class_ids[idx]], width);
+        float distance = compute_distance(focal, classes_width[class_ids[idx]], max(width, height));
 
         // Get the label for the class name and its confidence.
         string label = format("%.2f", confidences[idx]);
