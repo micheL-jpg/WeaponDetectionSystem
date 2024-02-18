@@ -177,13 +177,27 @@ Mat draw_boxes(Mat& input_image, const vector<string>& class_name, double focal,
     return input_image;
 }
 
+static void help(char** argv)
+{
+    printf("This is an application for the detection of the weapons.\n"
+        "Usage: %s\n\n"
+        "     [-c=<camera_params>]    # the filename for intrinsic [and extrinsic] parameters of the camera\n"
+        "     [-m=<net>]              # the filename of net to use for the detection\n"
+        "     [-n=<classes_names>]    # the filename with the names of the classes detected by the net\n"
+        "     [-w=<classes_width>]    # the filename with the width of the objects detected by the net\n"
+        "     [-l]                    # print some informations about the performance\n"
+        "\n"
+        "Example command line to use the program:\n"
+        "   .\\x64\\ReleaseWeaponDetectionSystem.exe -c=../camera_data.yml -m=../models/net.onnx -n=../weapon_classes.names -w=../width.names -l"
+        "\n\n"
+        "To quit the program use the key: <ESC>, 'q' or 'Q'\n", argv[0]
+    );
+}
+
 // Main del programma.
 int main(int argc, char** argv)
 {
-    Size boardSize, imageSize;
     Mat cameraMatrix, distCoeffs;
-    float squareSize;
-    double totalAvgErr = 0;
 
     string model_name_file;
     string classes_name_file;
@@ -204,11 +218,17 @@ int main(int argc, char** argv)
 
     // il parser predispone l'utilizzo degli argomenti ricevuti e definisce i valori di default
     cv::CommandLineParser parser(argc, argv,
-        "{c|../out_camera_data.yml|}"
+        "{help||}"
+        "{c|../camera_data.yml|}"
         "{m|../models/net.onnx|}"
         "{n|../weapon_classes.names|}"
         "{w|../width.names|}"
         "{l||}");
+    if (parser.has("help"))
+    {
+        help(argv);
+        return 0;
+    }
     if (parser.has("m")) {
         model_name_file=parser.get<string>("m");
     }
