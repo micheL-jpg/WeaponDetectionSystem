@@ -172,10 +172,6 @@ Mat draw_boxes(Mat& input_image, const vector<string>& class_name, double focal,
         int width = box.width;
         int height = box.height;
 
-        cout << "width: " << to_string(width) << endl;
-        cout << "class_wisth: " << classes_width[class_ids[idx]] << endl;
-        cout << "focal: " << focal << endl;
-
         // Draw bounding box.
         rectangle(input_image, Point(left, top), Point(left + width, top + height), BLUE, 3 * THICKNESS);
 
@@ -219,8 +215,6 @@ Mat post_process(Mat& input_image, vector<Mat>& outputs, const vector<string>& c
             float* classes_scores = data + 5;
             // Create a 1x85 Mat and store class scores of 80 classes.
             Mat scores(1, class_name.size(), CV_32FC1, classes_scores);
-
-            cout << "M = " << endl << " " << scores << endl << endl;
 
             // Perform minMaxLoc and acquire index of best class score.
             Point class_id;
@@ -350,7 +344,6 @@ int main(int argc, char** argv)
 
     while (getline(ifsw, line))
     {
-        cout << line << endl;
         width_list.push_back(stod(line));
     }
 
@@ -388,24 +381,24 @@ int main(int argc, char** argv)
             frame0.copyTo(frame);
         }
 
-        int64 start_pre = cv::getTickCount();
+        //int64 start_pre = cv::getTickCount();
 
         vector<Mat> detections;
         detections = pre_process(frame, net);
 
-        double end_pre = (cv::getTickCount() - start_pre)/getTickFrequency();
+        /*double end_pre = (cv::getTickCount() - start_pre)/getTickFrequency();
 
-        std::cout << "Preprocess count : " << end_pre << std::endl;
+        std::cout << "Preprocess count : " << end_pre << std::endl;*/
 
-        int64 start_post = cv::getTickCount();
+       /* int64 start_post = cv::getTickCount();*/
 
         Mat temp = frame.clone();
         post_process(temp, detections, class_list.size(), class_ids, confidences, boxes);
         Mat img = draw_boxes(temp, class_list, focal, width_list, class_ids, confidences, boxes);
 
-        double end_post = (cv::getTickCount() - start_post) / getTickFrequency();
+        /*double end_post = (cv::getTickCount() - start_post) / getTickFrequency();
 
-        std::cout << "Postprocess count : " << end_post << std::endl;
+        std::cout << "Postprocess count : " << end_post << std::endl;*/
 
         // Put efficiency information.
         // The function getPerfProfile returns the overall time for inference(t) and the timings for each of the layers(in layersTimes)
@@ -415,7 +408,6 @@ int main(int argc, char** argv)
         double t = net.getPerfProfile(layersTimes) / freq;
         string label = format("Inference time : %.2f ms", t);
         putText(img, label, Point(20, 40), FONT_FACE, FONT_SCALE, RED);
-        //waitKey(0);
 
         class_ids.clear();
         confidences.clear();
