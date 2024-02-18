@@ -89,9 +89,6 @@ vector<Mat> pre_process(Mat& input_image, Net& net)
     vector<Mat> outputs;
     net.forward(outputs, net.getUnconnectedOutLayersNames());
 
-    /*cout << "M = " << endl << " " << outputs.size() << endl << endl;
-    cout << "M = " << endl << " " << outputs[0].data[4] << endl << endl;*/
-
     return outputs;
 }
 
@@ -105,9 +102,6 @@ void post_process(Mat& input_image, vector<Mat>& outputs, int classes_number, ve
     auto dimensions = outputs[0].size[2];
     auto rows = outputs[0].size[1];
 
-    /*cout << "Dimesnions = " << endl << " " << dimensions << endl << endl;
-    cout << "Rows = " << endl << " " << rows << endl << endl;*/
-
     // Iterate through 25200 detections.
     for (int i = 0; i < rows; ++i)
     {
@@ -118,8 +112,6 @@ void post_process(Mat& input_image, vector<Mat>& outputs, int classes_number, ve
             float* classes_scores = data + 5;
             // Create a 1x85 Mat and store class scores of 80 classes.
             Mat scores(1, classes_number, CV_32FC1, classes_scores);
-
-            //cout << "M = " << endl << " " << scores << endl << endl;
 
             // Perform minMaxLoc and acquire index of best class score.
             Point class_id;
@@ -202,9 +194,6 @@ Mat post_process(Mat& input_image, vector<Mat>& outputs, const vector<string>& c
     auto dimensions = outputs[0].size[2];
     auto rows = outputs[0].size[1];
 
-    /*cout << "Dimesnions = " << endl << " " << dimensions << endl << endl;
-    cout << "Rows = " << endl << " " << rows << endl << endl;*/
-
     // Iterate through 25200 detections.
     for (int i = 0; i < rows; ++i)
     {
@@ -213,7 +202,7 @@ Mat post_process(Mat& input_image, vector<Mat>& outputs, const vector<string>& c
         if (confidence >= CONFIDENCE_THRESHOLD)
         {
             float* classes_scores = data + 5;
-            // Create a 1x85 Mat and store class scores of 80 classes.
+            // Create a 1xclass_name.size() Mat and store class scores of 80 classes.
             Mat scores(1, class_name.size(), CV_32FC1, classes_scores);
 
             // Perform minMaxLoc and acquire index of best class score.
@@ -328,7 +317,6 @@ int main(int argc, char** argv)
     const char* winName = "Image View";
     namedWindow(winName, 1);
 
-    //ifstream ifs("coco.names");
     ifstream ifsn(classes_name_file);
 
     while (getline(ifsn, line))
@@ -365,8 +353,6 @@ int main(int argc, char** argv)
         cout << "Fail to open camera" << endl;
         return -1;
     }
-
-    //char key = (char)waitKey(0);
 
     for (int i = 0;; i++)
     {
