@@ -35,6 +35,12 @@ const float FONT_SCALE = 0.7;
 const int FONT_FACE = FONT_HERSHEY_SIMPLEX;
 const int THICKNESS = 1;
 
+// Quanti frame devo aspettare senza detection prima di chiudere il video
+const int FRAME_SKIP_VIDEO = 10;
+
+vector<Mat> video_frames;
+int frame_counter = 0;
+
 // Colori.
 Scalar BLACK = Scalar(0, 0, 0);
 Scalar GREEN = Scalar(0, 255, 0);
@@ -217,7 +223,7 @@ int main(int argc, char** argv)
     double focal;
 
     // il parser predispone l'utilizzo degli argomenti ricevuti e definisce i valori di default
-    cv::CommandLineParser parser(argc, argv,
+    CommandLineParser parser(argc, argv,
         "{help||}"
         "{c|../camera_data.yml|}"
         "{m|../models/net.onnx|}"
@@ -294,7 +300,7 @@ int main(int argc, char** argv)
     for (int i = 0;; i++)
     {
         // viene utilizzato per il calcolo degli FPS
-        int64 start = cv::getTickCount();
+        int64 start = getTickCount();
 
         // viene catturata l'immagine e copiata per utilizzarla in sicurezza
         Mat frame0;
@@ -307,7 +313,7 @@ int main(int argc, char** argv)
         // se si vuole il log delle performance viene calcolato il tempo necessario al preprocessing
         int64 start_pre;
         if (log) {
-            start_pre = cv::getTickCount();
+            start_pre = getTickCount();
         }
 
         // viene corretta la distorsione dell'immagine dovuta alla lente della camera
@@ -321,9 +327,9 @@ int main(int argc, char** argv)
         // se si vuole il log delle performance viene stampato il tempo necessario al preprocessing e calcolato quello per il posprocessing
         int64 start_post;
         if (log) {
-            double end_pre = (cv::getTickCount() - start_pre) / getTickFrequency();
+            double end_pre = (getTickCount() - start_pre) / getTickFrequency();
             std::cout << "Preprocess count : " << end_pre << std::endl;
-            start_post = cv::getTickCount();
+            start_post = getTickCount();
         }
 
         // viene effettuato il post processing per recuperare le bounding box degli oggetti rilevati che vengono poi disegnati
@@ -338,7 +344,7 @@ int main(int argc, char** argv)
 
         // se si vuole il log delle performance viene stampato il tempo necessario al postprocessing
         if (log) {
-            double end_post = (cv::getTickCount() - start_post) / getTickFrequency();
+            double end_post = (getTickCount() - start_post) / getTickFrequency();
             std::cout << "Postprocess count : " << end_post << std::endl;
         }
 
@@ -352,7 +358,7 @@ int main(int argc, char** argv)
         }
 
         // vengono calcolati e mostrati gli FPS
-        double fps = cv::getTickFrequency() / (cv::getTickCount() - start);
+        double fps = getTickFrequency() / (getTickCount() - start);
         string label_fps = "FPS: " + to_string(fps);
         int baseline = 0;
         Size textSize = getTextSize(label_fps, FONT_FACE, FONT_SCALE, THICKNESS, &baseline);
