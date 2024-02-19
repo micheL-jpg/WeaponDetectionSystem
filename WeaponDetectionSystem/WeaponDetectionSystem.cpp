@@ -39,7 +39,7 @@ const int THICKNESS = 1;
 const int LIMIT_FRAME_NO_DETECTION = 30;
 const string PATH_FOR_VIDEO= "detectionVideo";
 
-//vector<Mat> video_frames;
+//contatore usato per contare i frame che trascorrovo dall'ultima individuazione dell'arma
 int frame_counter = 0;
 VideoWriter video;
 
@@ -149,42 +149,12 @@ float compute_distance(float focalLenght, float knownWidth, float perWidth) {
     return (knownWidth * focalLenght) / perWidth;
 }
 
-//void video_manager(Mat& nextFrame, bool save) {
-//
-//    if (save) {
-//        video_frames.push_back(nextFrame);
-//        frame_counter = 0;
-//    }
-//    else {
-//        frame_counter++;
-//    }
-//
-//    if (frame_counter >= FRAME_SKIP_VIDEO && video_frames.size() > 0 && !save) {
-//
-//        std::time_t t = std::time(nullptr);
-//        auto tm = *std::localtime(&t);
-//        std::ostringstream oss;
-//        oss << std::put_time(&tm, "%d-%m-%Y %H-%M-%S");
-//        string time_stamp = oss.str();
-//
-//        string file_name = PATH_FOR_VIDEO + "\\" + time_stamp + "_detection.avi";
-//
-//        VideoWriter video = VideoWriter(file_name, VideoWriter::fourcc('M', 'J', 'P', 'G'), 10, Size(nextFrame.size[1], nextFrame.size[0]));
-//
-//        for (int i = 0; i < video_frames.size(); i++) {
-//            video.write(video_frames[i]);
-//        }
-//
-//        video.release();
-//        video_frames.clear();
-//        frame_counter = 0;
-//    }
-//
-//}
-
+// Salva il frame contenente i risultati della rete all'interno del VideoWriter
 void save_video_frame(Mat& nextFrame) {
 
     if (!video.isOpened()) {
+
+        //come nome del file del video si utilizza il timestamp del primo frame del video
         std::time_t t = std::time(nullptr);
         auto tm = *std::localtime(&t);
         std::ostringstream oss;
@@ -232,10 +202,11 @@ Mat draw_boxes(Mat& input_image, const vector<string>& class_name, double focal,
 
         // disegna l'etichetta con il nome della classe e la confidence.
         string label = format("%.2f", confidences[idx]);
-        label = class_name[class_ids[idx]] + ":" + label + " - d: " + to_string(distance);
+        label = class_name[class_ids[idx]] + ":" + label + " - d: " + format("%.f", distance) + "cm";
         draw_label(input_image, label, left, top);
     }
 
+    // se l'oggetto inidividuato è a distanza di pericolo il frame viene salvato all'interno del video
     if (save_frame) {
         save_video_frame(input_image);
         frame_counter = 0;
@@ -358,6 +329,7 @@ int main(int argc, char** argv)
         return -1;
     }
 
+
     namespace fs = std::filesystem;
     fs::create_directory(PATH_FOR_VIDEO);
 
@@ -433,9 +405,9 @@ int main(int argc, char** argv)
         // viene mostrata l'immagine contenente le bounding box e gli altri testi
         imshow(winName, img);
 
+        // se sono passati i frame limite dall'ultima detection di un'arma ed è presente un video aperto, questo viene chiuso e salvato
         if (frame_counter >= LIMIT_FRAME_NO_DETECTION && video.isOpened()) {
             video.release();
-            cout << video.isOpened() << endl;
         }
 
         // se l'utente clicca "ESC", "q" o "Q" il programma termina
