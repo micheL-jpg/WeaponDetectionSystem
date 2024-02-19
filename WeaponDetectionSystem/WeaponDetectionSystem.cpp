@@ -36,11 +36,12 @@ const int FONT_FACE = FONT_HERSHEY_SIMPLEX;
 const int THICKNESS = 1;
 
 // Quanti frame devo aspettare senza detection prima di chiudere il video
-const int FRAME_SKIP_VIDEO = 30;
+const int LIMIT_FRAME_NO_DETECTION = 30;
 const string PATH_FOR_VIDEO= "detectionVideo";
 
-vector<Mat> video_frames;
+//vector<Mat> video_frames;
 int frame_counter = 0;
+VideoWriter video;
 
 // Colori.
 Scalar BLACK = Scalar(0, 0, 0);
@@ -148,18 +149,42 @@ float compute_distance(float focalLenght, float knownWidth, float perWidth) {
     return (knownWidth * focalLenght) / perWidth;
 }
 
-void video_manager(Mat& nextFrame, bool save) {
+//void video_manager(Mat& nextFrame, bool save) {
+//
+//    if (save) {
+//        video_frames.push_back(nextFrame);
+//        frame_counter = 0;
+//    }
+//    else {
+//        frame_counter++;
+//    }
+//
+//    if (frame_counter >= FRAME_SKIP_VIDEO && video_frames.size() > 0 && !save) {
+//
+//        std::time_t t = std::time(nullptr);
+//        auto tm = *std::localtime(&t);
+//        std::ostringstream oss;
+//        oss << std::put_time(&tm, "%d-%m-%Y %H-%M-%S");
+//        string time_stamp = oss.str();
+//
+//        string file_name = PATH_FOR_VIDEO + "\\" + time_stamp + "_detection.avi";
+//
+//        VideoWriter video = VideoWriter(file_name, VideoWriter::fourcc('M', 'J', 'P', 'G'), 10, Size(nextFrame.size[1], nextFrame.size[0]));
+//
+//        for (int i = 0; i < video_frames.size(); i++) {
+//            video.write(video_frames[i]);
+//        }
+//
+//        video.release();
+//        video_frames.clear();
+//        frame_counter = 0;
+//    }
+//
+//}
 
-    if (save) {
-        video_frames.push_back(nextFrame);
-        frame_counter = 0;
-    }
-    else {
-        frame_counter++;
-    }
+void save_video_frame(Mat& nextFrame) {
 
-    if (frame_counter >= FRAME_SKIP_VIDEO && video_frames.size() > 0 && !save) {
-
+    if (!video.isOpened()) {
         std::time_t t = std::time(nullptr);
         auto tm = *std::localtime(&t);
         std::ostringstream oss;
@@ -168,17 +193,10 @@ void video_manager(Mat& nextFrame, bool save) {
 
         string file_name = PATH_FOR_VIDEO + "\\" + time_stamp + "_detection.avi";
 
-        VideoWriter video = VideoWriter(file_name, VideoWriter::fourcc('M', 'J', 'P', 'G'), 10, Size(nextFrame.size[1], nextFrame.size[0]));
-
-        for (int i = 0; i < video_frames.size(); i++) {
-            video.write(video_frames[i]);
-        }
-
-        video.release();
-        video_frames.clear();
-        frame_counter = 0;
+        video = VideoWriter(file_name, VideoWriter::fourcc('M', 'J', 'P', 'G'), 10, Size(nextFrame.size[1], nextFrame.size[0]));
     }
 
+    video.write(nextFrame);
 }
 
 // Disegna le bounding box degli oggetti rilevati eliminando quelle sovrapposte
@@ -186,7 +204,8 @@ Mat draw_boxes(Mat& input_image, const vector<string>& class_name, double focal,
     // rimuove i rilevamenti sovrapposti con la Non Maximum Suppression utilizzando il rapporto tra l'intersezione e l'unione delle box
     vector<int> indices;
     NMSBoxes(boxes, confidences, SCORE_THRESHOLD, NMS_THRESHOLD, indices);
-    bool save_frame_video = false;
+
+    bool save_frame = false;
 
     for (int i = 0; i < indices.size(); i++)
     {
@@ -205,7 +224,7 @@ Mat draw_boxes(Mat& input_image, const vector<string>& class_name, double focal,
         float distance = compute_distance(focal, classes_width[class_ids[idx]], max(width, height));
         if (distance < DANGER_DISTANCE) {
             draw_label(input_image, "DANGER", left, top + height);
-            save_frame_video = true;
+            save_frame = true;
         }
         else {
             draw_label(input_image, "ATTENTION", left, top + height);
@@ -217,7 +236,11 @@ Mat draw_boxes(Mat& input_image, const vector<string>& class_name, double focal,
         draw_label(input_image, label, left, top);
     }
 
-    video_manager(input_image, save_frame_video);
+    if (save_frame) {
+        save_video_frame(input_image);
+        frame_counter = 0;
+    }
+    else frame_counter++;
 
     return input_image;
 }
@@ -409,6 +432,11 @@ int main(int argc, char** argv)
 
         // viene mostrata l'immagine contenente le bounding box e gli altri testi
         imshow(winName, img);
+
+        if (frame_counter >= LIMIT_FRAME_NO_DETECTION && video.isOpened()) {
+            video.release();
+            cout << video.isOpened() << endl;
+        }
 
         // se l'utente clicca "ESC", "q" o "Q" il programma termina
         char c = (char)waitKey(1);
