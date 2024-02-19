@@ -37,6 +37,7 @@ const int THICKNESS = 1;
 
 // Quanti frame devo aspettare senza detection prima di chiudere il video
 const int FRAME_SKIP_VIDEO = 10;
+const string PATH_FOR_VIDEO= "detectionVideo";
 
 vector<Mat> video_frames;
 int frame_counter = 0;
@@ -147,11 +148,45 @@ float compute_distance(float focalLenght, float knownWidth, float perWidth) {
     return (knownWidth * focalLenght) / perWidth;
 }
 
-// Disegna le bounding box degli oggetti rilevati eliminando quelle sovrapposte o con bassa confidence.
+void video_manager(Mat& nextFrame, bool save) {
+
+    if (save) {
+        video_frames.push_back(nextFrame);
+        frame_counter = 0;
+    }
+    else {
+        frame_counter++;
+    }
+
+    if (frame_counter >= FRAME_SKIP_VIDEO && video_frames.size() > 0 && !save) {
+
+        std::time_t t = std::time(nullptr);
+        auto tm = *std::localtime(&t);
+        std::ostringstream oss;
+        oss << std::put_time(&tm, "%d-%m-%Y %H-%M-%S");
+        string time_stamp = oss.str();
+
+        string file_name = PATH_FOR_VIDEO + "\\" + time_stamp + "_detection.avi";
+
+        VideoWriter video = VideoWriter(file_name, VideoWriter::fourcc('M', 'J', 'P', 'G'), 5, Size(INPUT_WIDTH, INPUT_HEIGHT));
+
+        for (int i = 0; i < video_frames.size(); i++) {
+            video.write(video_frames[i]);
+        }
+
+        video.release();
+        video_frames.clear();
+        frame_counter = 0;
+    }
+
+}
+
+// Disegna le bounding box degli oggetti rilevati eliminando quelle sovrapposte
 Mat draw_boxes(Mat& input_image, const vector<string>& class_name, double focal, vector<double> classes_width ,vector<int>& class_ids, vector<float>& confidences, vector<Rect>& boxes) {
     // rimuove i rilevamenti sovrapposti con la Non Maximum Suppression utilizzando il rapporto tra l'intersezione e l'unione delle box
     vector<int> indices;
     NMSBoxes(boxes, confidences, SCORE_THRESHOLD, NMS_THRESHOLD, indices);
+    bool save_frame_video = false;
 
     for (int i = 0; i < indices.size(); i++)
     {
@@ -163,23 +198,27 @@ Mat draw_boxes(Mat& input_image, const vector<string>& class_name, double focal,
         int width = box.width;
         int height = box.height;
 
+        // disegna bounding box
+        rectangle(input_image, Point(left, top), Point(left + width, top + height), BLUE, 3 * THICKNESS);
+
         // calcola la distanza e comunica il grado di minaccia
         float distance = compute_distance(focal, classes_width[class_ids[idx]], max(width, height));
         if (distance < DANGER_DISTANCE) {
             draw_label(input_image, "DANGER", left, top + height);
+            save_frame_video = true;
         }
         else {
             draw_label(input_image, "ATTENTION", left, top + height);
         }
-
-        // disegna bounding box
-        rectangle(input_image, Point(left, top), Point(left + width, top + height), BLUE, 3 * THICKNESS);
 
         // disegna l'etichetta con il nome della classe e la confidence.
         string label = format("%.2f", confidences[idx]);
         label = class_name[class_ids[idx]] + ":" + label + " - d: " + to_string(distance);
         draw_label(input_image, label, left, top);
     }
+
+    video_manager(input_image, save_frame_video);
+
     return input_image;
 }
 
@@ -256,7 +295,7 @@ int main(int argc, char** argv)
     }
 
     // la distanza focale viene calcolata come media tra quella orizzontale e quella verticale
-    focal = cameraMatrix.at<double>(0, 0) + cameraMatrix.at<double>(1, 1) / 2;
+    focal = (cameraMatrix.at<double>(0, 0) + cameraMatrix.at<double>(1, 1)) / 2;
 
     // lettura del file con i nomi delle classi
     ifstream ifsn(classes_name_file);
@@ -295,6 +334,9 @@ int main(int argc, char** argv)
         cout << "Fail to open camera" << endl;
         return -1;
     }
+
+    namespace fs = std::filesystem;
+    fs::create_directory(PATH_FOR_VIDEO);
 
     // ciclo infinito
     for (int i = 0;; i++)
