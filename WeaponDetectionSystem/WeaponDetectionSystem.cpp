@@ -188,7 +188,7 @@ static void help(char** argv)
         "     [-l]                    # print some informations about the performance\n"
         "\n"
         "Example command line to use the program:\n"
-        "   .\\x64\\ReleaseWeaponDetectionSystem.exe -c=../camera_data.yml -m=../models/net.onnx -n=../weapon_classes.names -w=../width.names -l"
+        "   ./x64/Release/WeaponDetectionSystem.exe -c=camera_data.yml -m=models/net.onnx -n=weapon_classes.names -w=width.names -l"
         "\n\n"
         "To quit the program use the key: <ESC>, 'q' or 'Q'\n", argv[0]
     );
