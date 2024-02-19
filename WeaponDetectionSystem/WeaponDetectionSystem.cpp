@@ -36,7 +36,7 @@ const int FONT_FACE = FONT_HERSHEY_SIMPLEX;
 const int THICKNESS = 1;
 
 // Quanti frame devo aspettare senza detection prima di chiudere il video
-const int FRAME_SKIP_VIDEO = 10;
+const int FRAME_SKIP_VIDEO = 30;
 const string PATH_FOR_VIDEO= "detectionVideo";
 
 vector<Mat> video_frames;
@@ -168,7 +168,7 @@ void video_manager(Mat& nextFrame, bool save) {
 
         string file_name = PATH_FOR_VIDEO + "\\" + time_stamp + "_detection.avi";
 
-        VideoWriter video = VideoWriter(file_name, VideoWriter::fourcc('M', 'J', 'P', 'G'), 5, Size(INPUT_WIDTH, INPUT_HEIGHT));
+        VideoWriter video = VideoWriter(file_name, VideoWriter::fourcc('M', 'J', 'P', 'G'), 10, Size(nextFrame.size[1], nextFrame.size[0]));
 
         for (int i = 0; i < video_frames.size(); i++) {
             video.write(video_frames[i]);
