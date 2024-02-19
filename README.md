@@ -16,6 +16,8 @@ The parameters you could pass to the program are:
 
 
 Example command line to use the program:
+```
 ./x64/Release/WeaponDetectionSystem.exe -c=camera_data.yml -m=models/net.onnx -n=weapon_classes.names -w=width.names -l
+```
 
 To quit the program use the key: 'ESC', 'q' or 'Q'
